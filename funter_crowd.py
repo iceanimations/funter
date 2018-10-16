@@ -92,7 +92,7 @@ class Funter(object):
         self._reffile = reffile
 
     @classmethod
-    def getFunters(cls):
+    def getFuntersFromRefs(cls):
         funters = []
         for refnode in pc.ls(type='reference'):
             try:
@@ -118,7 +118,6 @@ class FunterReplacer(object):
         self.parent_name = parent_name
 
     def get_proxy_path(self, funter):
-        print funter
         dirname = os.path.join(self.base_proxy_path, funter.anim, funter.char)
         nums, _max, name = [], -1, None
         if os.path.isdir(dirname):
@@ -129,7 +128,7 @@ class FunterReplacer(object):
                     if name is None or _max < num:
                         _max, name = num, filename
                     nums.append(num)
-        return os.path.join(self.base_proxy_path, name), max(nums)
+        return os.path.join(dirname, name), max(nums)
 
     def create_proxy(self, path, offset, _max):
         meshShape = pc.createNode('mesh')
@@ -153,6 +152,7 @@ class FunterReplacer(object):
         path, _max = self.get_proxy_path(funter)
         if not path:
             return
+        print path, funter
         offset = funter.get_anim_offset()
         meshShape = self.create_proxy(path, offset, _max)
         mesh = meshShape.firstParent()
@@ -169,7 +169,7 @@ class FunterReplacer(object):
             self.proxy_parent = pc.createNode('transform', n=self.parent_name)
 
         self.proxy_parent = self.parent_name
-        allfunters = Funter.getFunters()
+        allfunters = Funter.getFuntersFromRefs()
         for funter in allfunters:
 
             if self.proxy_exists(funter):
@@ -198,5 +198,7 @@ class FunterReplacer(object):
 
 if __name__ == "__main__":
     path = r'\\library\storage\Proxies\EBM\CrowdSetups\Ad02\test'
+    for x in Funter.getFuntersFromRefs():
+        print x
     replacer = FunterReplacer(path)
     replacer.replace_with_proxies()

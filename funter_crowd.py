@@ -156,7 +156,6 @@ class FunterReplacer(object):
             _max = getmax(path)
         if not path or _max < 1:
             return
-        print path, funter
         offset = funter.get_anim_offset()
         meshShape = self.create_proxy(path, offset, _max)
         mesh = meshShape.firstParent()

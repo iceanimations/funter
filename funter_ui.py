@@ -33,12 +33,12 @@ class FunterWithoutProxyUI(FunterUI):
     def setupUI(self):
         pc.setParent(self.parent)
         with pc.rowLayout(
-                nc=5, cw5=[30, 135, 135, 500, 100]) as self.mainLayout:
+                w=800, nc=5, cw5=[30, 135, 135, 400, 100]) as self.mainLayout:
             self.checkBox = pc.checkBox(v=False, l='')
             self.animText = pc.text(l=self.funter.anim)
             self.charText = pc.text(l=self.funter.char)
             self.pathField = pc.textFieldButtonGrp(
-                    cw2=[450, 50],
+                    cw2=[350, 50],
                     buttonLabel='...',
                     changeCommand=self.checkPath,
                     buttonCommand=self.browseForProxy)
@@ -86,7 +86,7 @@ class FunterWithProxyUI(FunterUI):
     def setupUI(self):
         pc.setParent(self.parent)
         with pc.rowLayout(
-                nc=4, cw4=[50, 150, 150, 450]) as self.mainLayout:
+                w=800, nc=4, cw4=[50, 150, 150, 450]) as self.mainLayout:
             self.checkBox = pc.checkBox(v=False, l='')
             self.animText = pc.text(l=self.funter.anim)
             self.charText = pc.text(l=self.funter.char)
@@ -106,7 +106,7 @@ class FunterReplacerUI(object):
         if pc.window(self.__winname__, exists=True):
             self.delete()
 
-        with pc.window(self.__winname__, width=800, height=800) as self.win:
+        with pc.window(self.__winname__, width=850, height=800) as self.win:
             with pc.columnLayout(adj=True):
                 self.basepath_textgrp = pc.textFieldButtonGrp(
                         label='Base Dir For Proxies: ',
@@ -118,37 +118,37 @@ class FunterReplacerUI(object):
                 pc.button(l='Populate Funters', c=self.populateFunters)
 
                 with pc.frameLayout(cll=True, l='Funters Without Proxy'):
-                    with pc.scrollLayout(h=200):
-                        with pc.columnLayout():
-                            with pc.rowLayout(
-                                    adj=True, nc=3, cw3=[50, 100, 100]):
-                                self.checkBoxWO = pc.checkBox(
-                                        l='', cc=self.toggleWO)
-                                pc.button(
-                                        l='Select Rig', w=100,
-                                        c=self.selectRigs)
-                                pc.button(
-                                        l='Bring Proxy', w=100,
-                                        c=self.bringProxies)
+                    with pc.columnLayout(adj=True, w=850):
+                        with pc.scrollLayout(h=400, w=850):
                             with pc.columnLayout(adj=True) as self.woutlayout:
                                 pass
+                        with pc.rowLayout(
+                                adj=True, nc=3, cw3=[50, 100, 100]):
+                            self.checkBoxWO = pc.checkBox(
+                                    l='', cc=self.toggleWO)
+                            pc.button(
+                                    l='Select Rig', w=100,
+                                    c=self.selectRigs)
+                            pc.button(
+                                    l='Bring Proxy', w=100,
+                                    c=self.bringProxies)
 
                 with pc.frameLayout(
                         cll=True, l='Funters With Proxy', collapse=True):
-                    with pc.scrollLayout(h=200):
-                        with pc.columnLayout():
-                            with pc.rowLayout(
-                                    adj=True, nc=3, cw3=[50, 100, 100]):
-                                self.checkBoxWith = pc.checkBox(
-                                        l='', cc=self.toggleWith)
-                                pc.button(
-                                        l='Select Rig', w=100,
-                                        c=self.selectProxies)
-                                pc.button(
-                                        l='Delete Proxy', w=100,
-                                        c=self.deleteProxies)
+                    with pc.columnLayout(adj=True, w=850):
+                        with pc.scrollLayout(h=200, w=850):
                             with pc.columnLayout(adj=True) as self.withlayout:
-                                pass
+                                    pass
+                        with pc.rowLayout(
+                                adj=True, nc=3, cw3=[50, 100, 100]):
+                            self.checkBoxWith = pc.checkBox(
+                                    l='', cc=self.toggleWith)
+                            pc.button(
+                                    l='Select Proxy', w=100,
+                                    c=self.selectProxies)
+                            pc.button(
+                                    l='Delete Proxy', w=100,
+                                    c=self.deleteProxies)
 
                 pc.button('close', c=self.delete)
 
@@ -186,7 +186,7 @@ class FunterReplacerUI(object):
         if self.checkBoxWith.getValue():
             self.markAllWith()
         else:
-            self.unmarkAllWO()
+            self.unmarkAllWith()
 
     def markAllWO(self):
         for funterui in self.funters_wo:

@@ -173,7 +173,7 @@ class FunterReplacerUI(object):
         pc.select(cl=True)
         for funterui in self.funters_with:
             if funterui.isSelected():
-                name = self.replace.get_proxy_node_name(funterui.funter)
+                name = self.replacer.get_proxy_node_name(funterui.funter)
                 pc.select(name, add=True)
 
     def toggleWO(self, *args):

@@ -154,13 +154,15 @@ class FunterReplacerUI(object):
 
     def bringProxies(self, *args):
         for funterui in self.funters_wo:
-            self.replacer.replace_with_proxy(
-                    funterui.funter, path=funterui.getPath())
+            if funterui.isSelected():
+                self.replacer.replace_with_proxy(
+                        funterui.funter, path=funterui.getPath())
         self.updateFunters()
 
     def deleteProxies(self, *args):
         for funterui in self.funters_with:
-            pc.delete(self.replacer.get_proxy_node_name(funterui.funter))
+            if funterui.isSelected():
+                pc.delete(self.replacer.get_proxy_node_name(funterui.funter))
         self.updateFunters()
 
     def selectRigs(self, *args):

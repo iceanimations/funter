@@ -3,17 +3,15 @@ import os
 import logging
 import re
 
+from . import utilities
 
-def get_first_keyframe(node):
-    queue = list()
-    queue.insert(0, node)
-    while queue:
-        node = queue.pop()
-        keyframe = pc.keyframe(node, q=True)
-        if keyframe:
-            return keyframe[0]
-        for child in node.getChildren():
-            queue.insert(0, child)
+
+reload(utilities)
+getmax = utilities.getmax
+get_first_keyframe = utilities.get_first_keyframe
+
+
+__all__ = ['Funter', 'FunterReplacer']
 
 
 class Funter(object):
@@ -56,7 +54,10 @@ class Funter(object):
             '_')[:-1])
 
     def _assign_anim(self):
-        self._anim = self.root.fullPath().split('|')[2]
+        if self.root.fullPath().split('|')[1] == 'Crowd_grp':
+            self._anim = self.root.fullPath().split('|')[2]
+        else:
+            raise ValueError('Funter Not part of Crowd Grp')
 
     def _assign_nodes(self):
         root = self._reffile.nodes()[0]
@@ -102,7 +103,7 @@ class Funter(object):
         return funters
 
     def get_anim_offset(self):
-        return get_first_keyframe(self.root)
+        return get_first_keyframe(self.root, ignore_top_node=True)
 
     def remove(self):
         pass
@@ -113,9 +114,9 @@ class FunterReplacer(object):
     expression = '%s.frameExtension = (frame + %d) %% %d'
     proxyPrefix = 'FunterProxy_'
 
-    def __init__(self, proxies_path, parent_name='FunterProxies'):
+    def __init__(self, proxies_path, proxy_parent='FunterProxies'):
         self.base_proxy_path = proxies_path
-        self.parent_name = parent_name
+        self.proxy_parent = proxy_parent
 
     def get_proxy_path(self, funter):
         dirname = os.path.join(self.base_proxy_path, funter.anim, funter.char)
@@ -128,7 +129,7 @@ class FunterReplacer(object):
                     if name is None or _max < num:
                         _max, name = num, filename
                     nums.append(num)
-        return os.path.join(dirname, name), max(nums)
+            return os.path.join(dirname, name), max(nums)
 
     def create_proxy(self, path, offset, _max):
         meshShape = pc.createNode('mesh')
@@ -148,36 +149,49 @@ class FunterReplacer(object):
     def proxy_exists(self, funter):
         return pc.objExists(self.get_proxy_node_name(funter))
 
-    def replace_with_proxy(self, funter):
-        path, _max = self.get_proxy_path(funter)
-        if not path:
+    def replace_with_proxy(self, funter, path=None):
+        if path is None:
+            path, _max = self.get_proxy_path(funter)
+        else:
+            _max = getmax(path)
+        if not path or _max < 1:
             return
         print path, funter
         offset = funter.get_anim_offset()
         meshShape = self.create_proxy(path, offset, _max)
         mesh = meshShape.firstParent()
-        pc.parent(mesh, '|'.join([self.proxy_parent, funter.anim]))
+        pc.parent(mesh, self.ensure_parent(funter))
         mesh.rename(self.proxyPrefix + funter.namespace)
         pc.xform(
             mesh, ws=True,
             matrix=pc.xform(funter.root, q=True, ws=True, matrix=True))
+        keyframes = pc.keyframe(funter.root, q=True)
+        if keyframes:
+            pc.copyKey(
+                    funter.root, t=':',
+                    at=['tx', 'ty', 'tz', 'rx', 'ry', 'rz', 'sx', 'sy', 'sz'])
+            pc.pasteKey(
+                    mesh, time=keyframes[0], connect=True,
+                    at=['tx', 'ty', 'tz', 'rx', 'ry', 'rz', 'sx', 'sy', 'sz'])
+        pc.sets('initialShadingGroup', fe=mesh)
         return mesh
+
+    def ensure_parent(self, funter):
+        if not pc.objExists(self.proxy_parent):
+            pc.createNode('transform', n=self.proxy_parent)
+        parent = '|' + '|'.join([self.proxy_parent, funter.anim])
+        if not pc.objExists(parent):
+            pc.createNode('transform', n=funter.anim, p=self.proxy_parent)
+        return pc.PyNode(parent)
 
     def replace_with_proxies(self):
         proxies = []
-        if not pc.objExists(self.parent_name):
-            self.proxy_parent = pc.createNode('transform', n=self.parent_name)
-
-        self.proxy_parent = self.parent_name
         allfunters = Funter.getFuntersFromRefs()
         for funter in allfunters:
 
             if self.proxy_exists(funter):
                 pc.warning('proxy for funter %s already exists' % funter)
                 continue
-
-            if not pc.objExists('|'.join([self.proxy_parent, funter.anim])):
-                pc.createNode('transform', n=funter.anim, p=self.proxy_parent)
 
             path = None
             try:

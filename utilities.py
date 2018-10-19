@@ -1,9 +1,13 @@
 import os
 import re
+import sys
 import pymel.core as pc
 
 
-__all__ = ['get_first_keyframe', 'getmax']
+__all__ = ['get_first_keyframe', 'get_pattern', 'rsexpr']
+
+
+rsexpr = r'(.*)[\._](\d+|#+)\.rs'
 
 
 def get_first_keyframe(node, ignore_top_node=False):
@@ -21,25 +25,31 @@ def get_first_keyframe(node, ignore_top_node=False):
             queue.insert(0, child)
 
 
-def getmax(path):
+def get_pattern(path):
     dirname, basename = os.path.split(path)
-    match = re.match(r'(.*)\.(\d+|#+)\.rs', basename)
-    _max = -1
+    match = re.match(rsexpr, basename)
+
+    _max = -sys.maxint-1
+    _min = sys.maxint
+
+    pattern = None
 
     if match:
         basename = match.group(1)
         frames = match.group(2)
-        new_re = r'\.'.join([basename, '(' + r'\d' * len(frames) + ')'])
+        new_re = r'\.'.join(
+                ['(' + basename + ')', '(' + r'\d' * len(frames) + ')'])
     else:
         return _max
 
     for filename in os.listdir(dirname):
         match = re.match(new_re, filename)
         if match:
-            num = int(match.group(1))
+            num = int(match.group(2))
             if num > _max:
+                pattern = '.'.join([match.group(1), '#' * len(match.group(1))])
                 _max = num
+            if num < _min:
+                _min = num
 
-    return _max
-
-
+    return pattern, _min, _max

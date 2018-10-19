@@ -8,10 +8,25 @@ FunterReplacer = funter_crowd.FunterReplacer
 
 
 class FunterUI(object):
-    def __init__(self, funter, parent):
+    def __init__(self, funter, replacer, uiparent):
         self.funter = funter
-        self.parent = parent
+        self.replacer = replacer
+        self.uiparent = uiparent
         self.setupUI()
+        self._set_path()
+
+    def setupUI(self):
+        pc.setParent(self.uiparent)
+        with pc.rowLayout(
+                w=800, nc=5, cw5=[30, 135, 135, 400, 100]) as self.mainLayout:
+            self.checkBox = pc.checkBox(v=False, l='')
+            self.animText = pc.text(l=self.funter.anim)
+            self.charText = pc.text(l=self.funter.char)
+            self.pathField = pc.textFieldButtonGrp(
+                    cw2=[350, 50], buttonLabel='...',
+                    changeCommand=self.checkPath,
+                    buttonCommand=self.browseForProxy)
+            self.statusField = pc.text()
 
     def isSelected(self):
         return self.checkBox.getValue()
@@ -27,39 +42,15 @@ class FunterUI(object):
     def delete(self):
         pc.deleteUI(self.mainLayout)
 
-
-class FunterWithoutProxyUI(FunterUI):
-
-    def setupUI(self):
-        pc.setParent(self.parent)
-        with pc.rowLayout(
-                w=800, nc=5, cw5=[30, 135, 135, 400, 100]) as self.mainLayout:
-            self.checkBox = pc.checkBox(v=False, l='')
-            self.animText = pc.text(l=self.funter.anim)
-            self.charText = pc.text(l=self.funter.char)
-            self.pathField = pc.textFieldButtonGrp(
-                    cw2=[350, 50],
-                    buttonLabel='...',
-                    changeCommand=self.checkPath,
-                    buttonCommand=self.browseForProxy)
-            self.statusField = pc.text()
-
-    def checkPath(self, *args):
-        path = self.pathField.getFileName()
-        if os.path.isfile(path):
-            self.setStatus('Proxy Found')
-            self.checkBox.setEnable(True)
-        else:
-            self.setStatus('Proxy Not Found', True)
-            self.checkBox.setValue(False)
-            self.checkBox.setEnable(False)
-
-    def setPath(self, path):
-        self.pathField.setFileName(path)
-        self.checkPath()
-
     def getPath(self):
         return self.pathField.getFileName()
+
+    def setStatus(self, status, red=False):
+        self.statusField.setLabel(status)
+        if red:
+            self.statusField.setBackgroundColor((1, 0.5, 0.5))
+        else:
+            self.statusField.setEnableBackground(False)
 
     def browseForProxy(self):
         mydir = self.pathField.getFileName()
@@ -67,35 +58,79 @@ class FunterWithoutProxyUI(FunterUI):
         if result:
             self.setPath(result[0])
 
-    def setStatus(self, status, red=False):
-        self.statusField.setLabel(status)
-        if red:
-            self.statusField.setBackgroundColor((1, 0.5, 0.5))
-            self.checkBox.setEnable(False)
+    def setPath(self, path):
+        self.pathField.setFileName(path)
+        self.checkPath()
+
+
+class FunterWithoutProxyUI(FunterUI):
+
+    def _set_path(self):
+        path = self.replacer.get_proxy_path(self.funter)
+        if path:
+            self.setPath(path)
+            self.setStatus('Proxy Found')
         else:
-            self.statusField.setEnableBackground(False)
+            self.setStatus('Cannot Find Proxy', True)
+
+    def checkPath(self, *args):
+        path = self.pathField.getFileName()
+        if os.path.isfile(path):
+            self.setStatus('Proxy Found')
             self.checkBox.setEnable(True)
+            return False
+        else:
+            self.setStatus('Proxy Not Found', True)
+            self.checkBox.setValue(False)
+            self.checkBox.setEnable(False)
+            return True
 
 
 class FunterWithProxyUI(FunterUI):
 
-    def __init__(self, funter, parent, path):
-        self.path = path
-        super(FunterWithProxyUI, self).__init__(funter, parent)
+    def _set_path(self):
+        proxy = self.replacer.get_proxy(self.funter)
+        path = None
+        if proxy:
+            path = proxy.fileName.get()
+
+        if path:
+            if os.path.isfile(path):
+                self.pathField.setFileName(path)
+                self.setStatus('OK')
+            else:
+                self.setStatus('Proxy path does not exist', True)
+        else:
+            self.setStatus('Proxy not connected', True)
+
+    def setPath(self, path):
+        if self.checkPath():
+            proxy = self.replacer.get_proxy(self.funter)
+            expr_made = self.replacer.set_proxy_path(
+                    proxy, path, self.funter.get_anim_offset())
+            if not expr_made:
+                self.setStatus('Proxy is not a sequence')
+            else:
+                self.setStatus('OK')
+            self.pathField.setFileName(path)
+        else:
+            pc.error('Specified File does not exist')
 
     def setupUI(self):
-        pc.setParent(self.parent)
-        with pc.rowLayout(
-                w=800, nc=4, cw4=[50, 150, 150, 450]) as self.mainLayout:
-            self.checkBox = pc.checkBox(v=False, l='')
-            self.animText = pc.text(l=self.funter.anim)
-            self.charText = pc.text(l=self.funter.char)
-            self.pathField = pc.text(l=self.path)
+        super(FunterWithProxyUI, self).setupUI()
+        self.pathField.setEditable(False)
+
+    def checkPath(self, *args):
+        path = self.pathField.getFileName()
+        if os.path.isfile(path):
+            return False
+        else:
+            return True
 
 
 class FunterReplacerUI(object):
     __winname__ = 'FunterReplacerUI'
-    __proxy_base__ = r'\\library\storage\Proxies\EBM\CrowdSetups\Ad02\test'
+    __proxy_base__ = r'\\library\storage\Proxies\EBM\CrowdSetups\Ad02\Loop'
 
     def __init__(self):
         self.setupui()
@@ -223,22 +258,12 @@ class FunterReplacerUI(object):
         self.clearFunters()
         for funter in self.funters:
             if not self.replacer.proxy_exists(funter):
-                elem = FunterWithoutProxyUI(funter, self.woutlayout)
-                path = self.replacer.get_proxy_path(funter)
-                if path:
-                    elem.setPath(path[0])
-                    elem.setStatus('Proxy Found')
-                else:
-                    elem.setStatus('Cannot Find Proxy', True)
+                elem = FunterWithoutProxyUI(
+                        funter, self.replacer, self.woutlayout)
                 self.funters_wo.append(elem)
             else:
-                mesh = pc.PyNode(self.replacer.get_proxy_node_name(funter))
-                try:
-                    proxy_node = mesh.getShape().inMesh.inputs()[0]
-                    path = proxy_node.fileName.get()
-                except:
-                    path = 'Cannot get Path!!!'
-                elem = FunterWithProxyUI(funter, self.withlayout, path)
+                elem = FunterWithProxyUI(
+                        funter, self.replacer, self.withlayout)
                 self.funters_with.append(elem)
 
     def browseForBaseProxyFolder(self, *args):

@@ -2,12 +2,13 @@ import pymel.core as pc
 import os
 import logging
 import re
+import sys
 
 from . import utilities
 
 
 reload(utilities)
-getmax = utilities.getmax
+get_pattern = utilities.get_pattern
 get_first_keyframe = utilities.get_first_keyframe
 
 
@@ -110,8 +111,8 @@ class Funter(object):
 
 
 class FunterReplacer(object):
-    rsexpr = r'.*\.(\d+)\.rs'
-    expression = '%s.frameExtension = (frame + %d) %% %d'
+    rsexpr = r'(.*?)[\._](\d+)\.rs'
+    expression = '%s.frameExtension = %d + (frame + %d) %% %d'
     proxyPrefix = 'FunterProxy_'
 
     def __init__(self, proxies_path, proxy_parent='FunterProxies'):
@@ -120,25 +121,37 @@ class FunterReplacer(object):
 
     def get_proxy_path(self, funter):
         dirname = os.path.join(self.base_proxy_path, funter.anim, funter.char)
-        nums, _max, name = [], -1, None
+        name = None
+        _min = sys.maxint
+
         if os.path.isdir(dirname):
             for filename in os.listdir(dirname):
                 match = re.match(self.rsexpr, filename)
                 if match:
-                    num = int(match.group(1))
-                    if name is None or _max < num:
-                        _max, name = num, filename
-                    nums.append(num)
-            return os.path.join(dirname, name), max(nums)
+                    num = int(match.group(2))
+                    if num < _min:
+                        _min = num
+                        name = filename
 
-    def create_proxy(self, path, offset, _max):
+        if name is not None:
+            return os.path.join(dirname, name)
+
+    def set_proxy_path(self, proxy, path, offset):
+        proxy.useFrameExtension.set(0)
+        pc.delete(proxy.frameExtension.inputs())
+        pattern, _min, _max = get_pattern(path)
+        proxy.fileName.set(path)
+        if pattern is None:
+            pc.expression(s=self.expression % (
+                proxy.name(), _min, offset, _max+1))
+            proxy.useFrameExtension.set(1)
+            return False
+        return True
+
+    def create_proxy(self):
         meshShape = pc.createNode('mesh')
         proxy = pc.createNode('RedshiftProxyMesh')
         proxy.outMesh.connect(meshShape.inMesh)
-        proxy.fileName.set(path)
-        pc.expression(s='%s.frameExtension = (frame+%s)%%%d' % (
-            proxy.name(), offset, _max))
-        proxy.useFrameExtension.set(1)
         return meshShape
 
     def get_proxy_node_name(self, funter):
@@ -151,29 +164,30 @@ class FunterReplacer(object):
 
     def replace_with_proxy(self, funter, path=None):
         if path is None:
-            path, _max = self.get_proxy_path(funter)
-        else:
-            _max = getmax(path)
-        if not path or _max < 1:
-            return
+            path = self.get_proxy_path(funter)
+        meshShape = self.create_proxy()
         offset = funter.get_anim_offset()
-        meshShape = self.create_proxy(path, offset, _max)
+        self.set_proxy_path(meshShape.inMesh.inputs()[0], path, offset)
         mesh = meshShape.firstParent()
         pc.parent(mesh, self.ensure_parent(funter))
         mesh.rename(self.proxyPrefix + funter.namespace)
         pc.xform(
             mesh, ws=True,
             matrix=pc.xform(funter.root, q=True, ws=True, matrix=True))
-        keyframes = pc.keyframe(funter.root, q=True)
-        if keyframes:
-            pc.copyKey(
-                    funter.root, t=':',
-                    at=['tx', 'ty', 'tz', 'rx', 'ry', 'rz', 'sx', 'sy', 'sz'])
-            pc.pasteKey(
-                    mesh, time=keyframes[0], connect=True,
-                    at=['tx', 'ty', 'tz', 'rx', 'ry', 'rz', 'sx', 'sy', 'sz'])
+        for at in ['tx', 'ty', 'tz', 'rx', 'ry', 'rz', 'sx', 'sy', 'sz']:
+            keyframes = pc.keyframe(funter.root.attr(at), q=True)
+            keys = pc.copyKey(funter.root, t=':', at=at)
+            if keys:
+                pc.pasteKey(mesh, time=keyframes[0], connect=True, at=at)
         pc.sets('initialShadingGroup', fe=mesh)
         return mesh
+
+    def get_proxy(self, funter):
+        try:
+            mesh = pc.PyNode(self.get_proxy_node_name(funter))
+            return mesh.getShape().inMesh.inputs()[0]
+        except Exception as exc:
+            print exc
 
     def ensure_parent(self, funter):
         if not pc.objExists(self.proxy_parent):

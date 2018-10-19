@@ -1,4 +1,5 @@
 import pymel.core as pc
+from pymel.core.language import Mel
 import os
 import logging
 import re
@@ -96,11 +97,21 @@ class Funter(object):
     @classmethod
     def getFuntersFromRefs(cls):
         funters = []
-        for refnode in pc.ls(type='reference'):
+        progressBar = Mel.globals['$gMainProgressBar']
+        refnodes = pc.ls(type='reference')
+        pc.progressBar(
+                progressBar, edit=True, beginProgress=True,
+                isInterruptable=True, status='Loading Funters ...',
+                maxValue=len(refnodes))
+        for refnode in refnodes:
+            if pc.progressBar(progressBar, q=True, isCancelled=True):
+                break
             try:
                 funters.append(Funter(refnode))
             except Exception as exc:
                 logging.debug(exc)
+            pc.progressBar(progressBar, edit=True, step=1)
+        pc.progressBar(progressBar, edit=True, endProgress=True)
         return funters
 
     def get_anim_offset(self):

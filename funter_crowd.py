@@ -141,7 +141,7 @@ class FunterReplacer(object):
         pc.delete(proxy.frameExtension.inputs())
         pattern, _min, _max = get_pattern(path)
         proxy.fileName.set(path)
-        if pattern is None:
+        if pattern is not None:
             pc.expression(s=self.expression % (
                 proxy.name(), _min, offset, _max+1))
             proxy.useFrameExtension.set(1)
